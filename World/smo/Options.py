@@ -80,18 +80,28 @@ class CaptureSanity(Toggle):
     #visibility = 0b1101
 
 class ExtraMoons(Choice):
-    """
-    Sets the multiplier for the number of extra moons available in the pool for each kingdom.
-    Default: some = 1.2x moons
-    """
+    """Sets the multiplier for the number of extra moons available in the pool for each kingdom.
+    Valid options: none (1.0x), some (1.2x), more (1.5x), many (1.75x), double (2.0x).
+    Default: some (1.2x moons)"""
     display_name = "Extra Moons"
-    option_none = 1.0
-    option_some = 1.2
-    option_more = 1.5
-    option_many = 1.75
-    option_double = 2.0
+    option_none = 0
+    option_some = 1
+    option_more = 2
+    option_many = 3
+    option_double = 4
+    default = 1  # some
 
-    default = 1.2  # default to some
+    multipliers = {
+        0: 1.0,
+        1: 1.2,
+        2: 1.5,
+        3: 1.75,
+        4: 2.0,
+    }
+
+    @property
+    def multiplier(self) -> float:
+        return self.multipliers[self.value]
 
 class TrickJumpLogic(Choice):
     """
