@@ -198,9 +198,9 @@ class SMOWorld(World):
                     # Use the moon counts from the original generation
                     self.moon_counts = dict(passthrough["MoonCounts"])
                     self.early_kingdom_order = validate_order(passthrough.get("EarlyKingdomOrder", ()))
-                self.short_route = validate_short_route(passthrough.get("ShortKingdomRoute", ()))
-                if self.short_route:
-                    self.options.goal.value = self.options.goal.option_moon
+                    self.short_route = validate_short_route(passthrough.get("ShortKingdomRoute", ()))
+                    if self.short_route:
+                        self.options.goal.value = self.options.goal.option_moon
         elif self.options.counts > 0:
             self.randomize_moon_amounts()
         create_regions(self, self.multiworld, self.player)
