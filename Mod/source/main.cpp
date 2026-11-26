@@ -699,6 +699,80 @@ void onStageChange(GameDataFile *file,const ChangeStageInfo* stageInfo, int para
     
 }
 
+// Kingdom-order proof of concept. Not a randomizer option: the pair is fixed.
+//
+// Vanilla story order (moon requirements and region goal gates):
+//   Cap -> Cascade -> Sand -> Lake -> Wooded
+// This PoC exchanges the two earliest sandbox kingdoms:
+//   Cap -> Sand -> Cascade -> Lake -> Wooded
+//
+// Only Odyssey departure is rewritten (changeNextStageWithDemoWorldWarp).
+// Doors, sub-areas, shop moons, and the globe map stay on onStageChange.
+// Each rewritten edge is matched on both the kingdom being left and the
+// vanilla destination, so a different departure from the same kingdom is
+// left alone.
+//
+// Scenario 1 is the first free-roam visit:
+//   - Client construction fills worldScenarios with 1, and a new game sets
+//     every kingdom to scenario 1.
+//   - Scenario 0 is the arrival intro. Cap scenario 0 is already special-cased
+//     because that demo softlocks, and a sandbox loaded at 0 expects story
+//     flags from the kingdom that was skipped.
+//   - Scenario -1 means "resolve it", which on a freshly unlocked kingdom
+//     falls through to that intro. The connector warp treats a forced
+//     scenario as dangerous for the same reason; 1 is the value this mod
+//     already uses as the default visit.
+//   - Metro scenario 3 (festival) and the moon-rock scenario are later,
+//     special visits. Scenario 1 stays under getMoonRockScenarioNo.
+// Unlocking before the stage change also makes Client::setScenario see the
+// world as already unlocked, so it will not replace this scenario.
+void onDepartureStageChange(GameDataFile* file, const ChangeStageInfo* stageInfo, int param2)
+{
+    if (file == nullptr || stageInfo == nullptr || file->mGameDataHolder == nullptr) {
+        onStageChange(file, stageInfo, param2);
+        return;
+    }
+
+    const int fromWorld = file->mCurWorldID;
+    const char* destStage = stageInfo->changeStageName.cstr();
+    const int cap = GameDataFunction::getWorldIndexHat();
+    const int cascade = GameDataFunction::getWorldIndexWaterfall();
+    const int sand = GameDataFunction::getWorldIndexSand();
+    const int lake = GameDataFunction::getWorldIndexLake();
+
+    int destWorld = -1;
+    const char* swappedStage = nullptr;
+
+    if (fromWorld == cap && al::isEqualString(destStage, "WaterfallWorldHomeStage")) {
+        destWorld = sand;
+        swappedStage = "SandWorldHomeStage";
+    } else if (fromWorld == sand && al::isEqualString(destStage, "LakeWorldHomeStage")) {
+        destWorld = cascade;
+        swappedStage = "WaterfallWorldHomeStage";
+    } else if (fromWorld == cascade && al::isEqualString(destStage, "SandWorldHomeStage")) {
+        destWorld = lake;
+        swappedStage = "LakeWorldHomeStage";
+    }
+
+    if (swappedStage == nullptr) {
+        onStageChange(file, stageInfo, param2);
+        return;
+    }
+
+    GameDataHolderWriter writer;
+    writer.mData = file->mGameDataHolder;
+    GameDataFunction::unlockWorld(writer, destWorld);
+    Client::setScenario(destWorld, 1);
+
+    // The vanilla entrance id belongs to the kingdom we are no longer
+    // loading. An empty id is the entrance the connector warp already uses.
+    ChangeStageInfo swapped(file->mGameDataHolder, "", swappedStage, false, 1,
+                            static_cast<ChangeStageInfo::SubScenarioType>(0));
+    Logger::log("Kingdom order PoC: depart world %d (%s) -> %s scenario 1\n", fromWorld, destStage,
+                swappedStage);
+    onStageChange(file, &swapped, param2);
+}
+
 void setShineLabel(al::IUseLayout* layout, const char* elementLabel)
 {
     al::setPaneStringFormat(layout, elementLabel, Client::getShineReplacementText());

@@ -148,8 +148,9 @@ B59E28 B seadPrintHook // sead::system::print
 // GameDataHolder::changeNextStage()
 52F71C BL onStageChange
 
-// GameDataFile::ChangeNextStageWithDemoWorldWarp()
-51DA40 BL onStageChange
+// GameDataFile::changeNextStageWithDemoWorldWarp()
+// Kingdom-order PoC: Odyssey departure only. Other stage changes stay on onStageChange.
+51DA40 BL onDepartureStageChange
 
 // Skip Shine Demo
 // PlayerActorHakoniwa::startDemoShineGet()
