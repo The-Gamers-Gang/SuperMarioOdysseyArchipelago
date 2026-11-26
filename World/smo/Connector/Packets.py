@@ -1,3 +1,4 @@
+from ..KingdomOrder import validate_order
 from enum import Enum
 from ctypes import c_short as short, c_ushort as ushort, c_byte as sbyte, c_ubyte as byte, c_byte, c_ubyte
 from math import trunc
@@ -181,6 +182,7 @@ class ChatMessagePacket:
 
 
 class SlotDataPacket:
+    BASE_SIZE = 28
     cascade : ushort
     sand : ushort
     wooded : ushort
@@ -198,8 +200,8 @@ class SlotDataPacket:
     captures : bool
     SIZE : short = 28
 
-    def __init__(self, packet_bytes : bytearray = None, cascade : int = None, sand : int = None, wooded : int = None, lake : int = None, lost : int = None, metro : int = None, seaside : int = None, snow : int = None, luncheon : int = None, ruined : int = None, bowser : int = None, dark : int = None, darker : int = None,  regionals : bool = None, captures : bool = None):
-        if packet_bytes:
+    def __init__(self, packet_bytes : bytearray = None, cascade : int = None, sand : int = None, wooded : int = None, lake : int = None, lost : int = None, metro : int = None, seaside : int = None, snow : int = None, luncheon : int = None, ruined : int = None, bowser : int = None, dark : int = None, darker : int = None,  regionals : bool = None, captures : bool = None, early_order=()):
+        if packet_bytes is not None:
             self.deserialize(packet_bytes)
         else:
             self.cascade = short(cascade)
@@ -217,6 +219,8 @@ class SlotDataPacket:
             self.darker = short(darker)
             self.regionals = regionals
             self.captures = captures
+            self.early_order = validate_order(early_order)
+            self.SIZE = self.BASE_SIZE + len(self.early_order)
 
     def serialize(self) -> bytearray:
         data : bytearray = bytearray()
@@ -248,8 +252,9 @@ class SlotDataPacket:
         data += int_value.to_bytes(2, "little")
         data += self.regionals.to_bytes(1, "little")
         data += self.captures.to_bytes(1, "little")
+        data += bytes(self.early_order)
         if len(data) != self.SIZE:
-            raise f"CountsPacket failed to serialize. bytearray is incorrect size {self.SIZE}."
+            raise ValueError("Bad SlotData packet size.")
         return data
 
     def deserialize(self, data : bytes | bytearray) -> None:
@@ -285,6 +290,10 @@ class SlotDataPacket:
         self.regionals = bool.from_bytes(data[offset:offset + 1], "little")
         offset += 1
         self.captures = bool.from_bytes(data[offset:offset + 1], "little")
+        self.early_order = validate_order(list(data[self.BASE_SIZE:]))
+        self.SIZE = self.BASE_SIZE + len(self.early_order)
+        if len(data) != self.SIZE:
+            raise ValueError("Bad SlotData packet size.")
 
 
 
@@ -628,7 +637,8 @@ class Packet:
                     self.packet = SlotDataPacket(cascade=packet_data[0], sand=packet_data[1], wooded=packet_data[2],
                         lake=packet_data[3], lost =packet_data[4], metro=packet_data[5], seaside=packet_data[6],
                         snow=packet_data[7], luncheon=packet_data[8], ruined=packet_data[9], bowser=packet_data[10],
-                        dark=packet_data[11], darker=packet_data[12], regionals=packet_data[13], captures=packet_data[14])
+                        dark=packet_data[11], darker=packet_data[12], regionals=packet_data[13], captures=packet_data[14],
+                        early_order=packet_data[15] if len(packet_data) > 15 else ())
                 case PacketType.ArchipelagoChat:
                     self.packet = ChatMessagePacket(messages=packet_data[0])
                 case PacketType.Check:

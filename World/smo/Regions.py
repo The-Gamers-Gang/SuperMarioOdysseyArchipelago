@@ -1,4 +1,5 @@
 import typing
+from .KingdomOrder import EARLY_KINGDOMS
 from BaseClasses import Region
 from . import world_list
 from .Options import SMOOptions
@@ -79,7 +80,7 @@ def create_regions(self, world, player):
     """
 
     # Cascade Regions
-    regCascade = Region("Menu", player, world, "Cascade Kingdom")
+    regCascade = Region("Cascade" if self.early_kingdom_order else "Menu", player, world, "Cascade Kingdom")
     create_locs(regCascade, *loc_Cascade.keys())
     world.regions.append(regCascade)
     regCascadePeace = Region("Cascade Peace", player, world, "Cascade Kingdom")
@@ -504,17 +505,40 @@ def create_regions(self, world, player):
         regMoon.connect(regPostMoon)
 
 
-    regCascadePeace.connect(regSand, "Sand Enter", lambda state: count_moons(self, state, "Cascade", player) >= self.moon_counts["cascade"])
-    regSand.connect(regSandPyramid, "Sand Pyramid Access")
-    regSandPyramid.connect(regSandUnderground, "Sand Story Subarea")
+    if self.early_kingdom_order:
+        start = Region("Menu", player, world, "Start")
+        world.regions.append(start)
+        early = {"Cascade": (regCascade, regCascadePeace),
+                 "Sand": (regSand, regSand),
+                 "Lake": (regLake, regLake)}
+        order = [EARLY_KINGDOMS[i] for i in self.early_kingdom_order]
+        start.connect(early[order[0]][0], f"{order[0]} First Visit")
+        for source, dest in zip(order, order[1:] + ["Wooded"]):
+            target = regWooded if dest == "Wooded" else early[dest][0]
+            # Preserve the vanilla no-extra-gate Lake -> Wooded choice.
+            gate = None
+            if (source, dest) != ("Lake", "Wooded"):
+                gate = lambda state, kingdom=source: (
+                    count_moons(self, state, kingdom, player) >= self.moon_counts[kingdom.lower()])
+            early[source][1].connect(target, f"{source} to {dest}", gate)
+        # Conservative: don't put progression on these revisits before the early route ends.
+        regWooded.connect(regCap, "Cap Revisit")
+        regWooded.connect(regCascadeRe, "Cascade Revisit")
+        regWooded.connect(regSandRe, "Sand Revisit")
+        regSand.connect(regSandPyramid, "Sand Pyramid Access")
+        regSandPyramid.connect(regSandUnderground, "Sand Story Subarea")
+        regSandPeace.connect(regMetroSand)
+    else:
+        regCascadePeace.connect(regSand, "Sand Enter", lambda state: count_moons(self, state, "Cascade", player) >= self.moon_counts["cascade"])
+        regSand.connect(regSandPyramid, "Sand Pyramid Access")
+        regSandPyramid.connect(regSandUnderground, "Sand Story Subarea")
+        regSand.connect(regCap)
+        regSand.connect(regCascadeRe)
+        regSandPeace.connect(regMetroSand)
+        regSand.connect(regLake, "Lake Enter", lambda state: count_moons(self, state, "Sand", player) >= self.moon_counts["sand"])
+        regLake.connect(regWooded, "Wooded Enter")
+        regLake.connect(regSandRe)
 
-    regSand.connect(regCap)
-    regSand.connect(regCascadeRe)
-    regSandPeace.connect(regMetroSand)
-    regSand.connect(regLake, "Lake Enter", lambda state: count_moons(self, state, "Sand", player) >= self.moon_counts["sand"])
-
-    regLake.connect(regWooded, "Wooded Enter")
-    regLake.connect(regSandRe)
 
     regWooded.connect(regWoodedStory1, "Wooded Story 1")
 
