@@ -208,6 +208,7 @@ class Client {
         static Shine* getRecentShine() { return sInstance ? sInstance->recentShine : nullptr; }
 
         static EarlyKingdomRoute::Order getEarlyKingdomOrder();
+        static EarlyKingdomRoute::ShortOrder getShortKingdomRoute();
         static int getWorldUnlockCount(int worldId); 
         static bool getRegionalsFlag() { return sInstance ? sInstance->regionals : false; }
         static bool getCapturesFlag() { return sInstance ? sInstance->captures : false; }
@@ -310,6 +311,7 @@ class Client {
         // shine pay counts
         sead::SafeArray<int, 17> worldPayCounts;
         EarlyKingdomRoute::Order earlyKingdomOrder{};
+        EarlyKingdomRoute::ShortOrder shortKingdomRoute{};
         bool regionals = false;
         bool captures = false;
         sead::SafeArray<int, 17> worldScenarios;

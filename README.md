@@ -90,3 +90,40 @@ Revisit checks are kept after the early route in the APWorld.
 `g++ -std=c++17 -I Mod/include tests/early_kingdom_route.cpp -o /tmp/early_kingdom_route && /tmp/early_kingdom_route`
 tests the pure routing code, not the Switch integration. A full mod link still
 needs devkitA64 and the Odyssey 1.0.0 symbol map; the repo contains only a stub.
+
+
+## Experimental short routes to Bowser (unverified in-game)
+
+```yaml
+name: OdysseyTester
+game: Super Mario Odyssey
+Super Mario Odyssey:
+  goal: moon
+  kingdoms_before_bowser: 4
+  extra_moons: some
+```
+
+Zero leaves all existing settings unchanged. Values 1 through 9 pick exactly
+that many distinct intermediate kingdoms in a seed-selected order. Cap, Bowser
+and Moon are fixed and do not count. The draft pool is Cascade, Sand, Wooded,
+Lake, Lost, Metro, Seaside, Snow and Luncheon. Cloud and Ruined are initially
+excluded because their scripted cutscenes/ship transitions need separate
+validation. Short routes require the Moon goal, default Early Kingdom Order
+and moon requirements, and capture shuffle off.
+
+The APWorld filters actual locations before item creation and fill. It
+conservatively omits painting/secret-path and hint-art journeys and certain
+late revisits/outfits where the short route has not established the needed
+world and story prerequisites. Location/item IDs are unchanged. The same
+route is stored in slot data, shown in the spoiler, reconstructed for
+Universal Tracker, and sent by the matching connector to the game mod.
+Older seeds and the previous three-kingdom shuffle retain their packet format.
+
+**Do not merge or use this for a live Hero playtest yet.** The mod must be
+built and tested on Odyssey 1.0.0 using matching APWorld, connector and mod
+binaries with a new save. Verify native departures, skipped destinations and
+map/revisits, moon counters and story gates (especially entering Bowser from
+a non-Ruined stop), and completion at the Moon Kingdom. Use a disposable
+mixed-game room and confirm actual checks, cross-player item delivery,
+reconnect and persisted route. An AP-generation pass or pure C++ test alone
+cannot prove the real game can take every route.

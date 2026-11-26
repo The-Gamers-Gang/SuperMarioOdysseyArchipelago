@@ -673,6 +673,13 @@ void onGrandShineStageChange(GameDataHolderWriter holder, ChangeStageInfo const*
 
 void onStageChange(GameDataFile *file,const ChangeStageInfo* stageInfo, int param2)
 {
+    if (file && stageInfo && EarlyKingdomRoute::isSkippedShortHome(
+            Client::getShortKingdomRoute(), file->mCurWorldID, stageInfo->changeStageName.cstr())) {
+        Logger::log("Short kingdom route: ignored travel to an omitted kingdom (%s)\n",
+                    stageInfo->changeStageName.cstr());
+        return;
+    }
+
     //Client::setMessage(1, stageInfo->changeStageId.cstr());
     // Add Wooded shop moon warp
     if (!(al::isEqualString(stageInfo->changeStageId.cstr(), "obj846") ||
@@ -709,8 +716,11 @@ void onDepartureStageChange(GameDataFile* file, const ChangeStageInfo* stageInfo
         return;
     }
     const char* nativeTarget = stageInfo->changeStageName.cstr();
-    const int dest = EarlyKingdomRoute::next(Client::getEarlyKingdomOrder(), file->mCurWorldID, nativeTarget);
-    const char* stage = EarlyKingdomRoute::home(dest);
+    const auto shortRoute = Client::getShortKingdomRoute();
+    const bool shortened = EarlyKingdomRoute::validShort(shortRoute);
+    const int dest = shortened ? EarlyKingdomRoute::nextShort(shortRoute, file->mCurWorldID, nativeTarget)
+                               : EarlyKingdomRoute::next(Client::getEarlyKingdomOrder(), file->mCurWorldID, nativeTarget);
+    const char* stage = shortened ? EarlyKingdomRoute::shortHome(dest) : EarlyKingdomRoute::home(dest);
     if (!stage) {
         onStageChange(file, stageInfo, param2);
         return;

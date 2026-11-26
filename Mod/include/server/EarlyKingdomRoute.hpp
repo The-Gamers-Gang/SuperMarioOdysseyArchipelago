@@ -39,4 +39,73 @@ inline int next(const Order& order, int from, const char* nativeTarget) {
             return i + 1 < order.size() ? order[i + 1] : Wooded;
     return -1;
 }
+// Distinct wire marker separates shortened routes from the legacy 3-byte suffix.
+constexpr std::uint8_t ShortMarker = 255;
+struct ShortOrder {
+    std::array<std::uint8_t, 9> ids{};
+    std::size_t count = 0;
+};
+constexpr int Cloud = 5, Lost = 6, Metro = 7, Seaside = 8, Snow = 9,
+              Luncheon = 10, Ruined = 11, Bowser = 12, Moon = 13;
+inline bool shortCandidate(int id) {
+    return id >= Cascade && id <= Luncheon && id != Cloud;
+}
+inline bool validShort(const ShortOrder& order) {
+    if (!order.count || order.count > order.ids.size()) return false;
+    unsigned mask = 0;
+    for (std::size_t i = 0; i < order.count; ++i) {
+        const auto id = order.ids[i];
+        if (!shortCandidate(id) || (mask & (1u << id))) return false;
+        mask |= 1u << id;
+    }
+    return true;
+}
+inline const char* shortHome(int id) {
+    switch (id) {
+        case Cloud: return "CloudWorldHomeStage";
+        case Lost: return "ClashWorldHomeStage";
+        case Metro: return "CityWorldHomeStage";
+        case Seaside: return "SeaWorldHomeStage";
+        case Snow: return "SnowWorldHomeStage";
+        case Luncheon: return "LavaWorldHomeStage";
+        case Ruined: return "BossRaidWorldHomeStage";
+        case Bowser: return "SkyWorldHomeStage";
+        case Moon: return "MoonWorldHomeStage";
+        default: return home(id);
+    }
+}
+inline bool isSkippedShortHome(const ShortOrder& order, int current, const char* stage) {
+    if (!validShort(order)) return false;
+    for (int id = Cascade; id <= Ruined; ++id) {
+        if (id != current && is(stage, shortHome(id))) {
+            for (std::size_t i = 0; i < order.count; ++i)
+                if (order.ids[i] == id) return false;
+            return true;
+        }
+    }
+    return false;
+}
+inline bool isNativeShortDeparture(int from, const char* stage) {
+    auto to = [stage](int id) { return is(stage, shortHome(id)); };
+    switch (from) {
+        case Cap: return to(Cascade);
+        case Cascade: return to(Sand);
+        case Sand: return to(Lake) || to(Wooded);
+        case Lake: return to(Wooded) || to(Cloud);
+        case Wooded: return to(Lake) || to(Cloud) || to(Lost);
+        case Lost: return to(Metro);
+        case Metro: return to(Seaside) || to(Snow);
+        case Seaside: return to(Snow) || to(Luncheon);
+        case Snow: return to(Seaside) || to(Luncheon);
+        case Luncheon: return to(Ruined) || to(Bowser);
+        default: return false;
+    }
+}
+inline int nextShort(const ShortOrder& route, int from, const char* nativeTarget) {
+    if (!validShort(route) || !isNativeShortDeparture(from, nativeTarget)) return -1;
+    if (from == Cap) return route.ids[0];
+    for (std::size_t i = 0; i < route.count; ++i)
+        if (route.ids[i] == from) return i + 1 < route.count ? route.ids[i + 1] : Bowser;
+    return -1;
+}
 } // namespace EarlyKingdomRoute

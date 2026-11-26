@@ -1,5 +1,5 @@
 import typing
-from .KingdomOrder import EARLY_KINGDOMS
+from .KingdomOrder import EARLY_KINGDOMS, SHORT_KINGDOMS
 from BaseClasses import Region
 from . import world_list
 from .Options import SMOOptions
@@ -80,7 +80,7 @@ def create_regions(self, world, player):
     """
 
     # Cascade Regions
-    regCascade = Region("Cascade" if self.early_kingdom_order else "Menu", player, world, "Cascade Kingdom")
+    regCascade = Region("Cascade" if (self.early_kingdom_order or self.short_route) else "Menu", player, world, "Cascade Kingdom")
     create_locs(regCascade, *loc_Cascade.keys())
     world.regions.append(regCascade)
     regCascadePeace = Region("Cascade Peace", player, world, "Cascade Kingdom")
@@ -505,7 +505,10 @@ def create_regions(self, world, player):
         regMoon.connect(regPostMoon)
 
 
-    if self.early_kingdom_order:
+    if self.short_route:
+        regSand.connect(regSandPyramid, "Sand Pyramid Access")
+        regSandPyramid.connect(regSandUnderground, "Sand Story Subarea")
+    elif self.early_kingdom_order:
         start = Region("Menu", player, world, "Start")
         world.regions.append(start)
         early = {"Cascade": (regCascade, regCascadePeace),
@@ -628,6 +631,71 @@ def create_regions(self, world, player):
     regPostGame.connect(regMushroomCaptures)
     regPostGame.connect(regWoodedPostGameCaptures)
     regPostGame.connect(regMetroPostGameCaptures)
+
+    if self.short_route:
+        # These are the only supported story arrivals/departures in short mode.
+        entries = {"Cascade": regCascade, "Sand": regSand, "Wooded": regWooded,
+                   "Lake": regLake, "Lost": regLost, "Metro": regNightMetro,
+                   "Seaside": regSeaside, "Snow": regSnow, "Luncheon": regLuncheon,
+                   "Bowser": regBowser}
+        exits = {**entries, "Cascade": regCascadePeace, "Metro": regMetro}
+        selected = [SHORT_KINGDOMS[i] for i in self.short_route]
+        active = {"Cap", *selected, "Bowser", "Moon"}
+        # Remove cross-world revisits in the experimental mode. Some entrances
+        # depend on routes and native story flags not yet proven for this mode.
+        excluded_regions = {
+            regCascadeMetro, regCascadeSnow, regLakeSeaside, regWoodedMetro,
+            regMetroSand, regLuncheonWooded, regMushroomLuncheon,
+            regCascadeRe, regCascadeShop, regSandRe, regLostRe,
+            regPostGame, regPostGameShop, regMoonShop, regMoonOutfit,
+        }
+
+        def owner(region):
+            if region is regNightMetro:
+                return "Metro"
+            if region is regPostMoon:
+                return "Moon"
+            return region.name.split()[0]
+
+        surviving = {region for region in world.get_regions(player)
+                     if owner(region) in active and region not in excluded_regions}
+        geographic = {f"{name} Kingdom": name for name in world_list}
+        gift_dependencies = {
+            "Mechanic Cap": {"Lake", "Wooded"}, "Mechanic Outfit": {"Lake", "Wooded"},
+            "Fashionable Cap": {"Lake", "Wooded"}, "Fashionable Outfit": {"Lake", "Wooded"},
+            "Pirate Hat": {"Snow", "Seaside"}, "Pirate Outfit": {"Snow", "Seaside"},
+            "Snow Kingdom - I'm Not Cold!": {"Sand"},
+        }
+        for region in list(world.get_regions(player)):
+            for location in list(region.locations):
+                physical = geographic.get(location.name.partition(" - ")[0], owner(region))
+                if (region not in surviving or physical not in active
+                        or "Secret Path" in location.name
+                        or ("Found with " in location.name and " Art" in location.name)
+                        or not gift_dependencies.get(location.name, set()) <= active):
+                    region.locations.remove(location)
+            for entrance in list(region.exits):
+                target = entrance.connected_region
+                if (region not in surviving or target not in surviving
+                        or (owner(region) != owner(target)
+                            and (region, target) != (regBowserPeace, regMoon))):
+                    if target is not None:
+                        target.entrances.remove(entrance)
+                    region.exits.remove(entrance)
+
+        start = Region("Menu", player, world, "Cap Kingdom")
+        world.regions.append(start)
+        start.connect(regCap, "Short Route Cap")
+        regCap.connect(entries[selected[0]], "Short Route First Kingdom")
+        for source, destination in zip(selected, [*selected[1:], "Bowser"]):
+            exits[source].connect(
+                entries[destination], f"Short Route {source} to {destination}",
+                lambda state, kingdom=source: count_moons(self, state, kingdom, player)
+                                               >= self.moon_counts[kingdom.lower()]
+            )
+        # Lock the real final check and make AP's fill prove that it is reachable.
+        world.get_location("Beat the Game", player).place_locked_item(self.create_item("Beat the Game"))
+        world.completion_condition[player] = lambda state: state.has("Beat the Game", player)
 
 def create_region (self, world, player):
 

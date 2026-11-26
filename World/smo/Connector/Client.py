@@ -163,7 +163,8 @@ class SMOContext(CommonContext):
                            self.slot_data["counts"]["bowser"], self.slot_data["counts"]["dark"],
                            self.slot_data["counts"]["darker"],
                            self.slot_data["regionals"], self.slot_data["capture_sanity"],
-                           self.slot_data.get("early_kingdom_order", ())]))
+                           self.slot_data.get("early_kingdom_order", ()),
+                           self.slot_data.get("short_kingdom_route", ())]))
 
 
 

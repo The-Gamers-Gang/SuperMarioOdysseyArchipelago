@@ -3335,6 +3335,10 @@ EarlyKingdomRoute::Order Client::getEarlyKingdomOrder() {
     return sInstance ? sInstance->earlyKingdomOrder : EarlyKingdomRoute::Order{};
 }
 
+EarlyKingdomRoute::ShortOrder Client::getShortKingdomRoute() {
+    return sInstance ? sInstance->shortKingdomRoute : EarlyKingdomRoute::ShortOrder{};
+}
+
 void Client::updateSlotData(SlotData* packet) {
     if (!sInstance) {
         Logger::log("Client Null!\n");
@@ -3346,10 +3350,17 @@ void Client::updateSlotData(SlotData* packet) {
         return;
     // Legacy packets have no route suffix. Refresh the route on reconnect.
     EarlyKingdomRoute::Order order{};
-    if (packet->mPacketSize == static_cast<int>(baseSize + order.size())) {
-        const auto* suffix = reinterpret_cast<const std::uint8_t*>(packet) + sizeof(SlotData);
+    EarlyKingdomRoute::ShortOrder shortRoute{};
+    const auto* suffix = reinterpret_cast<const std::uint8_t*>(packet) + sizeof(SlotData);
+    const int extra = packet->mPacketSize - static_cast<int>(baseSize);
+    if (extra >= 2 && extra <= static_cast<int>(shortRoute.ids.size() + 1)
+            && suffix[0] == EarlyKingdomRoute::ShortMarker) {
+        shortRoute.count = extra - 1;
+        for (std::size_t i = 0; i < shortRoute.count; ++i) shortRoute.ids[i] = suffix[i + 1];
+    } else if (extra == static_cast<int>(order.size())) {
         for (std::size_t i = 0; i < order.size(); ++i) order[i] = suffix[i];
     }
+    sInstance->shortKingdomRoute = EarlyKingdomRoute::validShort(shortRoute) ? shortRoute : EarlyKingdomRoute::ShortOrder{};
     sInstance->earlyKingdomOrder = EarlyKingdomRoute::valid(order) ? order : EarlyKingdomRoute::Order{};
     sInstance->worldPayCounts[1] = packet->cascade;
     sInstance->worldPayCounts[2] = packet->sand;
