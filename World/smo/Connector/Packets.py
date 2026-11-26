@@ -1,4 +1,4 @@
-from ..KingdomOrder import validate_order
+from ..KingdomOrder import validate_order, validate_short_route, SHORT_MARKER
 from enum import Enum
 from ctypes import c_short as short, c_ushort as ushort, c_byte as sbyte, c_ubyte as byte, c_byte, c_ubyte
 from math import trunc
@@ -200,7 +200,7 @@ class SlotDataPacket:
     captures : bool
     SIZE : short = 28
 
-    def __init__(self, packet_bytes : bytearray = None, cascade : int = None, sand : int = None, wooded : int = None, lake : int = None, lost : int = None, metro : int = None, seaside : int = None, snow : int = None, luncheon : int = None, ruined : int = None, bowser : int = None, dark : int = None, darker : int = None,  regionals : bool = None, captures : bool = None, early_order=()):
+    def __init__(self, packet_bytes : bytearray = None, cascade : int = None, sand : int = None, wooded : int = None, lake : int = None, lost : int = None, metro : int = None, seaside : int = None, snow : int = None, luncheon : int = None, ruined : int = None, bowser : int = None, dark : int = None, darker : int = None,  regionals : bool = None, captures : bool = None, early_order=(), short_route=()):
         if packet_bytes is not None:
             self.deserialize(packet_bytes)
         else:
@@ -220,7 +220,15 @@ class SlotDataPacket:
             self.regionals = regionals
             self.captures = captures
             self.early_order = validate_order(early_order)
-            self.SIZE = self.BASE_SIZE + len(self.early_order)
+            self.short_route = validate_short_route(short_route)
+            if self.early_order and self.short_route:
+                raise ValueError("Conflicting kingdom routes.")
+            self.SIZE = self.BASE_SIZE + len(self.route_bytes())
+
+    def route_bytes(self):
+        if self.short_route:
+            return bytes((SHORT_MARKER, *self.short_route))
+        return bytes(self.early_order)
 
     def serialize(self) -> bytearray:
         data : bytearray = bytearray()
@@ -252,7 +260,7 @@ class SlotDataPacket:
         data += int_value.to_bytes(2, "little")
         data += self.regionals.to_bytes(1, "little")
         data += self.captures.to_bytes(1, "little")
-        data += bytes(self.early_order)
+        data += self.route_bytes()
         if len(data) != self.SIZE:
             raise ValueError("Bad SlotData packet size.")
         return data
@@ -290,8 +298,16 @@ class SlotDataPacket:
         self.regionals = bool.from_bytes(data[offset:offset + 1], "little")
         offset += 1
         self.captures = bool.from_bytes(data[offset:offset + 1], "little")
-        self.early_order = validate_order(list(data[self.BASE_SIZE:]))
-        self.SIZE = self.BASE_SIZE + len(self.early_order)
+        suffix = list(data[self.BASE_SIZE:])
+        self.early_order = ()
+        self.short_route = ()
+        if suffix and suffix[0] == SHORT_MARKER:
+            self.short_route = validate_short_route(suffix[1:])
+            if not self.short_route:
+                raise ValueError("Empty short kingdom route.")
+        else:
+            self.early_order = validate_order(suffix)
+        self.SIZE = self.BASE_SIZE + len(self.route_bytes())
         if len(data) != self.SIZE:
             raise ValueError("Bad SlotData packet size.")
 
@@ -638,7 +654,8 @@ class Packet:
                         lake=packet_data[3], lost =packet_data[4], metro=packet_data[5], seaside=packet_data[6],
                         snow=packet_data[7], luncheon=packet_data[8], ruined=packet_data[9], bowser=packet_data[10],
                         dark=packet_data[11], darker=packet_data[12], regionals=packet_data[13], captures=packet_data[14],
-                        early_order=packet_data[15] if len(packet_data) > 15 else ())
+                        early_order=packet_data[15] if len(packet_data) > 15 else (),
+                        short_route=packet_data[16] if len(packet_data) > 16 else ())
                 case PacketType.ArchipelagoChat:
                     self.packet = ChatMessagePacket(messages=packet_data[0])
                 case PacketType.Check:

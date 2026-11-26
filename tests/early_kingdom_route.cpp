@@ -28,5 +28,20 @@ int main() {
     assert(next(Order{}, Cap, home(Cascade)) == -1);
     assert(!valid(Order{Cascade, Cascade, Lake}));
     assert(!valid(Order{Cascade, Sand, Wooded}));
+    const ShortOrder shortRoute{{Lake, Metro, Cascade, Snow}, 4};
+    assert(validShort(shortRoute));
+    assert(nextShort(shortRoute, Cap, home(Cascade)) == Lake);
+    assert(nextShort(shortRoute, Lake, home(Wooded)) == Metro);
+    assert(nextShort(shortRoute, Metro, shortHome(Seaside)) == Cascade);
+    assert(nextShort(shortRoute, Cascade, home(Sand)) == Snow);
+    assert(nextShort(shortRoute, Snow, shortHome(Luncheon)) == Bowser);
+    assert(nextShort(shortRoute, Bowser, shortHome(Moon)) == -1);
+    assert(nextShort(shortRoute, Sand, home(Lake)) == -1);
+    assert(nextShort(shortRoute, Metro, "ShopStage") == -1);
+    assert(isSkippedShortHome(shortRoute, Metro, shortHome(Seaside)));
+    assert(!isSkippedShortHome(shortRoute, Metro, shortHome(Cascade)));
+    assert(!isSkippedShortHome(shortRoute, Metro, "ShopStage"));
+    assert(!validShort(ShortOrder{{Sand, Sand}, 2}));
+    assert(!validShort(ShortOrder{{Cloud}, 1}));
+    assert(!validShort(ShortOrder{{Sand}, 10}));
 }
-

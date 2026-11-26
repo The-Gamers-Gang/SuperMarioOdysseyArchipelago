@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from Options import Toggle, Choice, FreeText, PerGameCommonOptions, DeathLink
+from Options import Toggle, Choice, Range, FreeText, PerGameCommonOptions, DeathLink
 
 
 class Goal(Choice):
@@ -124,6 +124,16 @@ class EarlyKingdomOrder(Choice):
     default = 0
 
 
+class KingdomsBeforeBowser(Range):
+    """Experimental Moon goal: choose exactly this many intermediate kingdoms.
+    Zero preserves the existing route option. Cap, Bowser and Moon are fixed.
+    Cloud and Ruined are excluded from the initial experimental pool."""
+    display_name = "Kingdoms Before Bowser"
+    range_start = 0
+    range_end = 9
+    default = 0
+
+
 class SMODeathLink(DeathLink):
     __doc__ = DeathLink.__doc__ + "\n    In Super Mario Odyssey, Mario dying in any way sends a death and receiving a death causes Mario to die where he stands."
 
@@ -131,6 +141,7 @@ class SMODeathLink(DeathLink):
 class SMOOptions(PerGameCommonOptions):
     goal: Goal
     early_kingdom_order: EarlyKingdomOrder
+    kingdoms_before_bowser: KingdomsBeforeBowser
     story : StorySanity
     extra_moons : ExtraMoons
     shop_sanity : ShopSanity

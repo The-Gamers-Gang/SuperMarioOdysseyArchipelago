@@ -8,7 +8,8 @@ from .Items import item_table, SMOItem, filler_item_table, outfits, shop_items, 
 from .Locations import locations_table, SMOLocation, locations_list, post_game_locations_list, \
     special_locations_table, full_moon_locations_list, goals_table
 from .Options import EarlyKingdomOrder, SMOOptions
-from .KingdomOrder import EARLY_KINGDOMS, SLOT_KEY, roll_order, validate_order
+from .KingdomOrder import (EARLY_KINGDOMS, SLOT_KEY, roll_order, validate_order,
+                           SHORT_KINGDOMS, SHORT_KEY, roll_short_route, validate_short_route)
 from .Rules import set_rules
 from .Regions import create_regions
 from BaseClasses import Item, ItemClassification
@@ -175,6 +176,7 @@ class SMOWorld(World):
     coin_values = {}
 
     early_kingdom_order = ()
+    short_route = ()
 
     # Change regionals to be dependent on the option
     def fill_slot_data(self) -> Mapping[str, Any]:
@@ -183,18 +185,22 @@ class SMOWorld(World):
                 "shop_games" : self.shop_games, "shop_players" : self.shop_players, "shop_ap_items" : self.shop_ap_items,
                 "shop_replace_data" : self.shop_replace_data, "coin_values" : self.coin_values,
                 "regionals" : False,
-                **({SLOT_KEY: list(self.early_kingdom_order)} if self.early_kingdom_order else {})}
+                **({SLOT_KEY: list(self.early_kingdom_order)} if self.early_kingdom_order else {}),
+                **({SHORT_KEY: list(self.short_route)} if self.short_route else {})}
 
     def create_regions(self):
         self.moon_counts = dict(self.moon_counts)
         # Check if this is Universal Tracker generation using existing slot data
-        if hasattr(self.multiworld, "generation_is_fake"):
+        if getattr(self.multiworld, "generation_is_fake", False):
             if hasattr(self.multiworld, "re_gen_passthrough"):
                 if "Super Mario Odyssey" in self.multiworld.re_gen_passthrough:
                     passthrough = self.multiworld.re_gen_passthrough["Super Mario Odyssey"]
                     # Use the moon counts from the original generation
                     self.moon_counts = dict(passthrough["MoonCounts"])
                     self.early_kingdom_order = validate_order(passthrough.get("EarlyKingdomOrder", ()))
+                self.short_route = validate_short_route(passthrough.get("ShortKingdomRoute", ()))
+                if self.short_route:
+                    self.options.goal.value = self.options.goal.option_moon
         elif self.options.counts > 0:
             self.randomize_moon_amounts()
         create_regions(self, self.multiworld, self.player)
@@ -202,6 +208,14 @@ class SMOWorld(World):
     def generate_early(self):
         if getattr(self.multiworld, "generation_is_fake", False):
             return
+        if self.options.kingdoms_before_bowser.value:
+            if self.options.goal.value != self.options.goal.option_moon:
+                raise ValueError("Kingdoms Before Bowser currently requires the Moon goal.")
+            if self.options.counts.value or self.options.capture_sanity.value:
+                raise ValueError("Short routes require default moon quotas and captures off.")
+            if self.options.early_kingdom_order.value:
+                raise ValueError("Use the default Early Kingdom Order with Kingdoms Before Bowser.")
+            self.short_route = roll_short_route(self.random, self.options.kingdoms_before_bowser.value)
         if self.options.early_kingdom_order.value == EarlyKingdomOrder.option_shuffle:
             if self.options.goal.value < self.options.goal.option_metro:
                 raise ValueError("Early kingdom shuffle requires a Metro or later goal.")
@@ -260,7 +274,7 @@ class SMOWorld(World):
             pool.append("Coins")
 
         # Beat Bowser in Cloud
-        if self.options.goal >= self.options.goal.option_metro:
+        if not self.short_route and self.options.goal >= self.options.goal.option_metro:
             pool.append("Coins")
 
         # Additively build pool
@@ -269,6 +283,8 @@ class SMOWorld(World):
 
         locations: list = []
         for location in self.get_locations():
+            if self.short_route and location.name == "Beat the Game":
+                continue
             if location.name in outfits or location.name in shop_items:
                 continue
             else:
@@ -685,6 +701,9 @@ class SMOWorld(World):
                     self.shop_ap_items.index(location.item.name.replace("_", " ")), location.item.classification.value]
 
     def write_spoiler_header(self, spoiler_handle: TextIO) -> None:
+        if self.short_route:
+            names = ["Cap", *(SHORT_KINGDOMS[i] for i in self.short_route), "Bowser", "Moon"]
+            spoiler_handle.write(f"{'Short Kingdom Path:':33}{' -> '.join(names)}\n")
         if self.early_kingdom_order:
             names = ["Cap", *(EARLY_KINGDOMS[i] for i in self.early_kingdom_order), "Wooded"]
             spoiler_handle.write(f"{'Early Kingdom Path:':33}{' -> '.join(names)}\n")
@@ -710,6 +729,9 @@ class SMOWorld(World):
         # Parse moon count requirements for each kingdom
         relevant_data["MoonCounts"] = slot_data["counts"]
         relevant_data["EarlyKingdomOrder"] = validate_order(slot_data.get(SLOT_KEY, ()))
+        relevant_data["ShortKingdomRoute"] = validate_short_route(slot_data.get(SHORT_KEY, ()))
+        if relevant_data["ShortKingdomRoute"] and relevant_data["EarlyKingdomOrder"]:
+            raise ValueError("Conflicting kingdom routes in slot data.")
         
         # Parse game options
         relevant_data["Goal"] = slot_data["goal"]
