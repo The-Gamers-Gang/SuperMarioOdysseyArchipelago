@@ -7,7 +7,8 @@ from .Items import item_table, SMOItem, filler_item_table, outfits, shop_items, 
     location_hint_list
 from .Locations import locations_table, SMOLocation, locations_list, post_game_locations_list, \
     special_locations_table, full_moon_locations_list, goals_table
-from .Options import SMOOptions
+from .Options import EarlyKingdomOrder, SMOOptions
+from .KingdomOrder import EARLY_KINGDOMS, SLOT_KEY, roll_order, validate_order
 from .Rules import set_rules
 from .Regions import create_regions
 from BaseClasses import Item, ItemClassification
@@ -173,28 +174,40 @@ class SMOWorld(World):
     shop_replace_data = {}
     coin_values = {}
 
+    early_kingdom_order = ()
+
     # Change regionals to be dependent on the option
     def fill_slot_data(self) -> Mapping[str, Any]:
         return {**(self.options.as_dict("goal", "colors", "capture_sanity", "death_link")), "counts" : self.moon_counts,
                 "shine_items" : self.shine_items, "shine_replace_data" : self.shine_replace_data, "shine_colors" : self.shine_colors,
                 "shop_games" : self.shop_games, "shop_players" : self.shop_players, "shop_ap_items" : self.shop_ap_items,
                 "shop_replace_data" : self.shop_replace_data, "coin_values" : self.coin_values,
-                "regionals" : False}
+                "regionals" : False,
+                **({SLOT_KEY: list(self.early_kingdom_order)} if self.early_kingdom_order else {})}
 
     def create_regions(self):
+        self.moon_counts = dict(self.moon_counts)
         # Check if this is Universal Tracker generation using existing slot data
         if hasattr(self.multiworld, "generation_is_fake"):
             if hasattr(self.multiworld, "re_gen_passthrough"):
                 if "Super Mario Odyssey" in self.multiworld.re_gen_passthrough:
                     passthrough = self.multiworld.re_gen_passthrough["Super Mario Odyssey"]
                     # Use the moon counts from the original generation
-                    self.moon_counts = passthrough["MoonCounts"]
+                    self.moon_counts = dict(passthrough["MoonCounts"])
+                    self.early_kingdom_order = validate_order(passthrough.get("EarlyKingdomOrder", ()))
         elif self.options.counts > 0:
             self.randomize_moon_amounts()
         create_regions(self, self.multiworld, self.player)
 
     def generate_early(self):
-        pass
+        if getattr(self.multiworld, "generation_is_fake", False):
+            return
+        if self.options.early_kingdom_order.value == EarlyKingdomOrder.option_shuffle:
+            if self.options.goal.value < self.options.goal.option_metro:
+                raise ValueError("Early kingdom shuffle requires a Metro or later goal.")
+            if self.options.counts.value or self.options.capture_sanity.value:
+                raise ValueError("Early kingdom shuffle does not yet support randomized moon counts or captures.")
+            self.early_kingdom_order = roll_order(self.random)
         # self.multiworld.early_items[self.player]["Cascade Multi-Moon"] = 1
         # self.multiworld.early_items[self.player]["Cascade Story Moon"] = 1
         # self.multiworld.early_items[self.player]["Cascade Power Moon"] = self.moon_counts["cascade"]-4
@@ -672,6 +685,9 @@ class SMOWorld(World):
                     self.shop_ap_items.index(location.item.name.replace("_", " ")), location.item.classification.value]
 
     def write_spoiler_header(self, spoiler_handle: TextIO) -> None:
+        if self.early_kingdom_order:
+            names = ["Cap", *(EARLY_KINGDOMS[i] for i in self.early_kingdom_order), "Wooded"]
+            spoiler_handle.write(f"{'Early Kingdom Path:':33}{' -> '.join(names)}\n")
         if self.options.counts > 0:
             text = f"{'Moon Requirements:':33}"
             for key in self.moon_counts.keys():
@@ -693,6 +709,7 @@ class SMOWorld(World):
         
         # Parse moon count requirements for each kingdom
         relevant_data["MoonCounts"] = slot_data["counts"]
+        relevant_data["EarlyKingdomOrder"] = validate_order(slot_data.get(SLOT_KEY, ()))
         
         # Parse game options
         relevant_data["Goal"] = slot_data["goal"]

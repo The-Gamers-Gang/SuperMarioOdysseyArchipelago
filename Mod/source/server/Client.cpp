@@ -3331,11 +3331,26 @@ void Client::updateChatMessages(ArchipelagoChatMessage* packet)
     sInstance->apChatLine3 = packet->message3;
 }
 
+EarlyKingdomRoute::Order Client::getEarlyKingdomOrder() {
+    return sInstance ? sInstance->earlyKingdomOrder : EarlyKingdomRoute::Order{};
+}
+
 void Client::updateSlotData(SlotData* packet) {
     if (!sInstance) {
         Logger::log("Client Null!\n");
         return;
     }
+    constexpr auto baseSize = sizeof(SlotData) - sizeof(Packet);
+    static_assert(baseSize == 28, "Unexpected SlotData layout");
+    if (packet->mPacketSize < static_cast<int>(baseSize))
+        return;
+    // Legacy packets have no route suffix. Refresh the route on reconnect.
+    EarlyKingdomRoute::Order order{};
+    if (packet->mPacketSize == static_cast<int>(baseSize + order.size())) {
+        const auto* suffix = reinterpret_cast<const std::uint8_t*>(packet) + sizeof(SlotData);
+        for (std::size_t i = 0; i < order.size(); ++i) order[i] = suffix[i];
+    }
+    sInstance->earlyKingdomOrder = EarlyKingdomRoute::valid(order) ? order : EarlyKingdomRoute::Order{};
     sInstance->worldPayCounts[1] = packet->cascade;
     sInstance->worldPayCounts[2] = packet->sand;
     sInstance->worldPayCounts[3] = packet->wooded;

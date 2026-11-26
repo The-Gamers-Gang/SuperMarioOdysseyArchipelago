@@ -7,6 +7,7 @@
  *
  */
 #pragma once
+#include "server/EarlyKingdomRoute.hpp"
 
 #include "Keyboard.hpp"
 #include "al/actor/ActorInitInfo.h"
@@ -206,6 +207,7 @@ class Client {
         static void setRecentShine(Shine* curShine);
         static Shine* getRecentShine() { return sInstance ? sInstance->recentShine : nullptr; }
 
+        static EarlyKingdomRoute::Order getEarlyKingdomOrder();
         static int getWorldUnlockCount(int worldId); 
         static bool getRegionalsFlag() { return sInstance ? sInstance->regionals : false; }
         static bool getCapturesFlag() { return sInstance ? sInstance->captures : false; }
@@ -307,6 +309,7 @@ class Client {
         ushort raidCount = 3;
         // shine pay counts
         sead::SafeArray<int, 17> worldPayCounts;
+        EarlyKingdomRoute::Order earlyKingdomOrder{};
         bool regionals = false;
         bool captures = false;
         sead::SafeArray<int, 17> worldScenarios;

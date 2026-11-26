@@ -115,12 +115,22 @@ class MiscTrickLogic(Choice):
 
     default = 0  # default to off
 
+class EarlyKingdomOrder(Choice):
+    """Experimental: shuffle Cascade, Sand and Lake per seed. Cap and Wooded onward
+    stay fixed. Requires the matching experimental connector and game mod."""
+    display_name = "Early Kingdom Order"
+    option_vanilla = 0
+    option_shuffle = 1
+    default = 0
+
+
 class SMODeathLink(DeathLink):
     __doc__ = DeathLink.__doc__ + "\n    In Super Mario Odyssey, Mario dying in any way sends a death and receiving a death causes Mario to die where he stands."
 
 @dataclass
 class SMOOptions(PerGameCommonOptions):
     goal: Goal
+    early_kingdom_order: EarlyKingdomOrder
     story : StorySanity
     extra_moons : ExtraMoons
     shop_sanity : ShopSanity
